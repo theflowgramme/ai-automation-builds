@@ -54,3 +54,29 @@ Retrieves apartment data from the listing database.
 
 **Send Text Node**  
 Delivers the AI-generated response back to the guest on WhatsApp.
+
+## Note
+
+This repository contains the workflow structure only.
+
+API keys, tokens, and credentials are **not included** for security reasons.  
+You must provide your own credentials when importing the workflow into n8n.
+## Credentials Setup
+
+After importing the workflow into n8n, you must configure the required credentials.
+
+The workflow requires the following services:
+
+- Evolution API (WhatsApp)
+- OpenAI API
+- Redis
+- Google Sheets API
+
+Steps:
+
+1. Import the workflow JSON into n8n
+2. Open each node that shows a credential warning
+3. Add your own credentials for the required services
+4. Activate the workflow
+
+Once credentials are configured, the workflow will run normally.
