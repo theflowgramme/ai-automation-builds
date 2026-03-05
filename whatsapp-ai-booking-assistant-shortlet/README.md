@@ -4,6 +4,10 @@ AI-powered WhatsApp front desk assistant built with n8n that automates shortlet 
 
 The system handles apartment inquiries, retrieves listing data from Google Sheets, maintains conversation context with Redis, and guides guests through the booking process using an AI agent.
 
+## Workflow Canvas
+
+![n8n Workflow](workflow-canvas.png)
+
 ## Stack
 
 - n8n
