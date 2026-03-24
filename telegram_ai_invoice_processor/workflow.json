@@ -1,0 +1,974 @@
+{
+  "name": "TG Invoice Analyser",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const d = $json.output ?? {};\n\nreturn [\n  {\n    json: {\n      invoiceNumber: d.invoiceNumber ?? null,\n      invoiceDate: d.invoiceDate ?? null,\n      dueDate: d.dueDate ?? null,\n      deliveryDate: d.deliveryDate ?? null,\n      vendorName: d.vendorName ?? null,\n      customerName: d.customerName ?? null,\n      customerAddress: d.customerAddress ?? null,\n      currency: d.currency ?? null,\n      subtotal: d.subtotal ?? null,\n      tax: d.tax ?? null,\n      total: d.total ?? null,\n      items: Array.isArray(d.items) ? d.items : [],\n      itemDescriptions: Array.isArray(d.items)\n        ? d.items.map(i => i.description).join(\"\\n\")\n        : \"\",\n      itemQuantities: Array.isArray(d.items)\n        ? d.items.map(i => i.quantity ?? \"\").join(\"\\n\")\n        : \"\",\n      itemUnitPrices: Array.isArray(d.items)\n        ? d.items.map(i => i.unitPrice ?? \"\").join(\"\\n\")\n        : \"\",\n      itemAmounts: Array.isArray(d.items)\n        ? d.items.map(i => i.amount ?? \"\").join(\"\\n\")\n        : \"\"\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        -960
+      ],
+      "id": "1b34ba3b-de8f-4315-b21a-d9e8f5fae152",
+      "name": "cleanup_json"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Extract structured invoice data from the OCR text below.\n\nReturn ONLY this JSON format:\n\n{\n  \"invoiceNumber\": string|null,\n  \"invoiceDate\": string|null,\n  \"dueDate\": string|null,\n  \"deliveryDate\": string|null,\n  \"vendorName\": string|null,\n  \"customerName\": string|null,\n  \"customerAddress\": string|null,\n  \"currency\": string|null,\n  \"subtotal\": number|null,\n  \"tax\": number|null,\n  \"total\": number|null,\n  \"items\": [\n    {\n      \"description\": string,\n      \"quantity\": number|null,\n      \"unitPrice\": number|null,\n      \"amount\": number|null\n    }\n  ]\n}\n\nRules:\n- Return only valid JSON.\n- Do not include markdown or explanation.\n- Infer currency from symbols like €, $, £ or labels like EUR, USD, GBP.\n- Extract total from labels like TOTAL, TOTAL DUE, AMOUNT DUE, or final payable amount.\n- If all item quantities are visually shown as 1 for each line item, return quantity as 1.\n- Use the recipient/client block as customerAddress.\n- If the customer name is not explicitly shown, return null.\n- Correct obvious OCR spelling mistakes in item descriptions when the intended text is clear.\n- Do not invent missing values.\n- Return null where a field is not present.\n\nOCR TEXT:\n{{ $json[\"ParsedResults\"][0][\"ParsedText\"] }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an invoice data extraction engine.\n\nYou ONLY return valid JSON.\nDo not include explanations.\nDo not include markdown.\nDo not include text outside JSON."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        384,
+        -784
+      ],
+      "id": "6937f01c-58e3-44ad-aac0-87b5cbfbe41a",
+      "name": "llm_extract",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Invoice Sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16x-G0-n9ppH_7JCyJS1R4Rh1IQK4oUSaDqLTBVRaMvo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_LINK"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Invoice Number": "={{ $json.invoiceNumber }}",
+            "Customer Name": "={{ $json.customerName }}",
+            "Invoice Date": "={{ $json.invoiceDate }}",
+            "Due Date": "={{ $json.dueDate }}",
+            "Delivery Date": "={{ $json.deliveryDate }}",
+            "Vendor Name": "={{ $json.vendorName }}",
+            "Customer Address": "={{ $json.customerAddress }}",
+            "Currency": "={{ $json.currency }}",
+            "Subtotal": "={{ $json.subtotal }}",
+            "Tax": "={{ $json.tax }}",
+            "Total": "={{ $json.total }}",
+            "Item Descriptions": "={{ $json.itemDescriptions }}",
+            "Item Quantities": "={{ $json.itemQuantities }}",
+            "Item Unit Prices": "={{ $json.itemUnitPrices }}",
+            "Item Amounts": "={{ $json.itemAmounts }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Invoice Number",
+              "displayName": "Invoice Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Invoice Date",
+              "displayName": "Invoice Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Due Date",
+              "displayName": "Due Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Delivery Date",
+              "displayName": "Delivery Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Vendor Name",
+              "displayName": "Vendor Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Customer Address",
+              "displayName": "Customer Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Currency",
+              "displayName": "Currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtotal",
+              "displayName": "Subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tax",
+              "displayName": "Tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Item Descriptions",
+              "displayName": "Item Descriptions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Item Quantities",
+              "displayName": "Item Quantities",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Item Unit Prices",
+              "displayName": "Item Unit Prices",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Item Amounts",
+              "displayName": "Item Amounts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1136,
+        -800
+      ],
+      "id": "199d1877-afda-4d79-96dd-ae7a0f34377c",
+      "name": "append_invoice_details",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "oyWLDixF3i7dFkSV",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.photo ? $json.message.photo[$json.message.photo.length-1].file_id : $json.message.document ? $json.message.document.file_id : null }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        -768
+      ],
+      "id": "b5bf7269-f6ea-4888-a398-89b38e22b17b",
+      "name": "download_image",
+      "webhookId": "b4c3300a-a676-4acb-b871-77ed04222728",
+      "retryOnFail": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "X8wZY6NTyCf6cgVd",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Invoice Details\n{{ $json[\"Invoice Details\"] }}\n\nFile Name\n{{ $json.file }}\n\nInvoice Database Link\nYOUR_GOOGLE_SHEET_ID",
+        "options": {
+          "systemMessage": "=You are an efficient invoice assistant.\n\nYou will receive cleaned structured invoice data in JSON format.\nYour job is to generate a short, clear user-facing confirmation message.\n\nRequirements:\n- Thank the user for submitting the invoice.\n- Mention the invoice number if available.\n- Mention the total amount and currency if available.\n- Mention the due date if available.\n- Mention the uploaded file name.\n- Tell the user the invoice has been added to Google Drive.\n- Include that they can access the invoice database using the provided link.\n- Keep the response concise and easy to read.\n- Do not mention fields that are null or missing.\n\nExample Output\n\nThanks for submitting your invoice ✅\n\nInvoice Number: 202244  \nTotal Amount: EUR 5,500  \nDue Date: 2024-03-08  \n\nThe invoice has been successfully uploaded to Google Drive as:\n\"Invoice 202244 [22-March-2026 | 05:42 PM]\"\n\nYou can access the invoice database here:\nhttps://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1184,
+        -560
+      ],
+      "id": "25e7c62f-4d26-4706-af08-6391749ea65e",
+      "name": "invoice-processor",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "name": "=Invoice {{ $('cleanup_json').item.json.invoiceNumber || Math.floor(Math.random() * 10000) }} [{{ $now.format('dd-MMMM-yyyy') }} | {{ $now.format('hh:mm a').toUpperCase() }}]",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "15VmENaQMdo1-Qh0oUo1kJqURuQPAq5sj",
+          "mode": "list",
+          "cachedResultName": "Invoice",
+          "cachedResultUrl": "YOUR_GOOGLE_DRIVE_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1888,
+        -560
+      ],
+      "id": "e7ec09d0-3783-49dc-90ec-0554c06f2c07",
+      "name": "upload_invoice",
+      "retryOnFail": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "BVqVsnreUYPHYIA9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"invoiceNumber\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"invoiceDate\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"dueDate\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"deliveryDate\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"vendorName\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"customerName\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"customerAddress\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"currency\": {\n      \"type\": [\"string\", \"null\"]\n    },\n    \"subtotal\": {\n      \"type\": [\"number\", \"null\"]\n    },\n    \"tax\": {\n      \"type\": [\"number\", \"null\"]\n    },\n    \"total\": {\n      \"type\": [\"number\", \"null\"]\n    },\n    \"items\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"description\": {\n            \"type\": \"string\"\n          },\n          \"quantity\": {\n            \"type\": [\"number\", \"null\"]\n          },\n          \"unitPrice\": {\n            \"type\": [\"number\", \"null\"]\n          },\n          \"amount\": {\n            \"type\": [\"number\", \"null\"]\n          }\n        },\n        \"required\": [\"description\"]\n      }\n    }\n  },\n  \"required\": [\"items\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        464,
+        -960
+      ],
+      "id": "3a05206b-5394-4f63-acf1-9dd92b1e3744",
+      "name": "output_parser"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1552,
+        -544
+      ],
+      "id": "8c368de7-b69d-43ed-b3a3-74de4d52439c",
+      "name": "send_response",
+      "webhookId": "1935d365-c0c6-47e2-9ae2-14060cf51eb8",
+      "credentials": {
+        "telegramApi": {
+          "id": "X8wZY6NTyCf6cgVd",
+          "name": "InvoiceAgent"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        736,
+        -640
+      ],
+      "id": "9ca70661-ab34-418e-b627-f520e488d225",
+      "name": "brain",
+      "credentials": {
+        "openAiApi": {
+          "id": "9trUxn4kwxSEWnXm",
+          "name": "OpenAI Account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        -640
+      ],
+      "id": "19bb011f-839f-4a71-89d5-b45df8791d9e",
+      "name": "Think"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "208806dd-0851-4829-95d6-3f4e71f98851",
+              "name": "Invoice Details",
+              "value": "={{ JSON.stringify($('cleanup_json').item.json, null, 2) }}",
+              "type": "string"
+            },
+            {
+              "id": "be993699-ac27-48b9-9ad4-efe5e5b7ddcb",
+              "name": "file",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1904,
+        -320
+      ],
+      "id": "9b6262de-880b-4bfb-bb38-247962e0ed7c",
+      "name": "set_info"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0];\n\nif (!item.binary || !item.binary.data) {\n  throw new Error(\"No binary file found\");\n}\n\nconst binary = item.binary.data;\nconst mime = binary.mimeType || \"\";\n\nlet fileType = \"unknown\";\n\nif (mime.includes(\"pdf\")) {\n  fileType = \"pdf\";\n} else if (mime.includes(\"png\")) {\n  fileType = \"png\";\n} else if (mime.includes(\"jpeg\") || mime.includes(\"jpg\")) {\n  fileType = \"jpg\";\n}\n\nreturn [\n  {\n    json: {\n      fileType\n    },\n    binary: {\n      data: binary\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        -768
+      ],
+      "id": "ceb59d22-8368-4440-95f9-dabe3e4860c9",
+      "name": "detect_file_type"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ocr.space/parse/image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "filetype",
+              "value": "PDF"
+            },
+            {
+              "name": "OCREngine",
+              "value": "2"
+            },
+            {
+              "name": "isTable",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        112,
+        -512
+      ],
+      "id": "48e29f84-a93f-4e38-9932-48a7a16d48e5",
+      "name": "analyze_pdf",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3NgX5fptXwe5kA82",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "png",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "6d9224f9-3a50-4556-b98b-e79aae946614"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "png"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "bb5b8b8c-5d7d-49b3-9458-34e28a0659c6",
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "jpg",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "jpg"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a8a756a9-e4d3-4422-a85f-645f4d261a24",
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pdf"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -144,
+        -800
+      ],
+      "id": "833abd21-a9be-45ab-a31b-eac2f1cf5742",
+      "name": "Switch",
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "Please send a PNG, JPG, or PDF invoice",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        -320
+      ],
+      "id": "23670ee8-6ad8-499c-9828-b598d4e465c0",
+      "name": "fallback_error_msg",
+      "webhookId": "1935d365-c0c6-47e2-9ae2-14060cf51eb8",
+      "credentials": {
+        "telegramApi": {
+          "id": "X8wZY6NTyCf6cgVd",
+          "name": "InvoiceAgent"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -800,
+        -768
+      ],
+      "id": "13abc443-4aeb-452a-8a9c-559d9b30eb85",
+      "name": "Telegram Trigger",
+      "webhookId": "d4a1f769-f1a7-4ad0-9223-134c626cae8b",
+      "credentials": {
+        "telegramApi": {
+          "id": "X8wZY6NTyCf6cgVd",
+          "name": "InvoiceAgent"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ocr.space/parse/image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "isTable",
+              "value": "True"
+            },
+            {
+              "name": "OCREngine",
+              "value": "2"
+            },
+            {
+              "name": "filetype",
+              "value": "JPG"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        96,
+        -784
+      ],
+      "id": "ecb1fe2c-4d02-4f0d-9189-02a131f1b258",
+      "name": "analyze _jpg",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3NgX5fptXwe5kA82",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ocr.space/parse/image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "isTable",
+              "value": "True"
+            },
+            {
+              "name": "OCREngine",
+              "value": "2"
+            },
+            {
+              "name": "filetype",
+              "value": "PNG"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        96,
+        -1056
+      ],
+      "id": "69143b26-b157-4f3f-9df9-b019ed8ea9fb",
+      "name": "analyze _png",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3NgX5fptXwe5kA82",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1872,
+        -784
+      ],
+      "id": "e9288bca-770e-4301-bfcb-4029f76df18b",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "cleanup_json": {
+      "main": [
+        [
+          {
+            "node": "append_invoice_details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "llm_extract": {
+      "main": [
+        [
+          {
+            "node": "cleanup_json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "append_invoice_details": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "download_image": {
+      "main": [
+        [
+          {
+            "node": "detect_file_type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "invoice-processor": {
+      "main": [
+        [
+          {
+            "node": "send_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upload_invoice": {
+      "main": [
+        [
+          {
+            "node": "set_info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "output_parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "llm_extract",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "brain": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "invoice-processor",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "llm_extract",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "invoice-processor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "llm_extract",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_info": {
+      "main": [
+        [
+          {
+            "node": "invoice-processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "detect_file_type": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "analyze_pdf": {
+      "main": [
+        [
+          {
+            "node": "llm_extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "analyze _png",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "analyze _jpg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "analyze_pdf",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "fallback_error_msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "download_image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "analyze _jpg": {
+      "main": [
+        [
+          {
+            "node": "llm_extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "analyze _png": {
+      "main": [
+        [
+          {
+            "node": "llm_extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "upload_invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8e1d051d-ce44-4386-b75d-8a2c7b0998f3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "159fb8e7cf5d5a89c6bd3073d96d9f3c79a4bbea42d9210ea829d5af550cb2a3"
+  },
+  "id": "Foz0M-mhi-qEjznhhL5qQ",
+  "tags": []
+}
