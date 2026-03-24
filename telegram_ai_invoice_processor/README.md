@@ -4,6 +4,12 @@ An n8n workflow that accepts invoice files sent via Telegram (PDF, JPG, or PNG),
 
 ---
 
+## Workflow Canvas
+
+![Telegram AI Invoice Processor Workflow](./workflow-canvas.png)
+
+---
+
 ## How It Works
 
 ```
