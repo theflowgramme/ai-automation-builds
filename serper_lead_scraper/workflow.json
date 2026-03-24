@@ -1,0 +1,1558 @@
+{
+  "name": "SERPER LEAD SCRAPER",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c52bbef3-c0a6-4017-a403-abaaee216895",
+              "name": "context",
+              "value": "={{ $json.context }}",
+              "type": "string"
+            },
+            {
+              "id": "ae883a9e-7207-48ef-ad1f-9c86076e0308",
+              "name": "num_search_terms",
+              "value": "={{ $json.num_search_terms ?? 2 }}",
+              "type": "number"
+            },
+            {
+              "id": "043c47a6-6200-42ca-a50e-650d7f382faa",
+              "name": "location_str",
+              "value": "={{ $json.location_str }}",
+              "type": "string"
+            },
+            {
+              "id": "0dcb4a6e-d4f2-4ae0-ac05-f443d6129eb9",
+              "name": "top_results",
+              "value": "={{ $json.top_results }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        656,
+        192
+      ],
+      "id": "9411f6b5-ea06-4197-a7ee-bf7070fd82fc",
+      "name": "configuration"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n    \"type\": \"object\",\n    \"properties\": {\n        \"search_terms\": {\n            \"type\": \"array\",\n            \"description\": \"the google search terms\",\n            \"items\": {\n                \"type\": \"string\"\n            }\n        }\n    },\n    \"required\": [\n        \"search_terms\"\n    ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        -80
+      ],
+      "id": "6a38e54f-52d7-4adc-ab4b-35892aad3abe",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        464
+      ],
+      "id": "13a1a0a7-5338-4a11-a7d8-445d67d6e80c",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "qZEWIS8LQ0gz5RGR",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.search_terms",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        64
+      ],
+      "id": "af24905c-4f65-4819-84fa-e82ff2eabbda",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "places",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        64
+      ],
+      "id": "053824f8-b5ee-4ec5-98f1-1e059907559f",
+      "name": "Split Out1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<Context>\n{{ $json.context }}\n</Context>\n\n<Instructions>\nI want to run a research on Google on the context above. \nHelp me to come up with search terms I can use.\nI need exactly {{ $json.num_search_terms }} search term(s) - no more no less. \nMake sure to be creative, and give me different ones so I can get diverse search results.\n</Instructions>\nOnly give me business listings search keywords,the keywords will be use in lead generation",
+        "hasOutputParser": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        1216,
+        64
+      ],
+      "id": "75c92846-3d76-43cb-b5d5-64b11b97f568",
+      "name": "create search terms"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst industry = (data.Industry || '').trim();\nconst country = (data.Country || '').trim();\nconst state = (data.State || '').trim();\n\n// Global-friendly: state is optional\nconst location_str = state ? `${state}, ${country}` : `${country}`;\n\nconst context = state\n  ? `${industry} in ${state}, ${country}`\n  : `${industry} in ${country}`;\n\nreturn [{\n  json: {\n    context,\n    industry,\n    country,\n    state: state || null,\n    location_str,\n    num_search_terms: Number(data.num_search_terms ?? 2),\n    top_results: Number(data.top_results ?? 10),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        192
+      ],
+      "id": "f36d803b-a9e2-49fa-a9a0-c354bca0b283",
+      "name": "FormatQuery"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/maps",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"q\": \"{{ $json['output.search_terms'] }}\",\n  \"location\": \"{{ $('configuration').item.json.location_str }}\",\n  \"num\": {{ $('configuration').item.json.top_results }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1808,
+        64
+      ],
+      "id": "ff47cb56-03d9-4482-95bb-496d11d21493",
+      "name": "searchwithSerper",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FheSFipO7zIdkXRZ",
+          "name": "SerperAPI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst seen = new Set();\n\nfor (const [index, item] of $input.all().entries()) {\n  const place = item.json;\n\n  if (!place.title) continue;\n  if (!place.address) continue;\n  if (place.permanentlyClosed === true) continue;\n  if (!place.website) continue;\n  if (!place.phoneNumber) continue;\n  if ((place.rating ?? 0) < 4.0) continue;\n  if ((place.ratingCount ?? 0) < 10) continue;\n\n  const uniqueId = place.placeId || `${place.title}|${place.address}`;\n  if (seen.has(uniqueId)) continue;\n  seen.add(uniqueId);\n\n  results.push({\n    json: {\n      business_name: place.title,\n      name: place.title,\n      address: place.address,\n      phone: place.phoneNumber,\n      website: place.website,\n      rating: place.rating ?? null,\n      reviews: place.ratingCount ?? null,\n      category: place.type ?? null,\n      placeId: place.placeId ?? null,\n    },\n    pairedItem: {\n      item: index,\n    },\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        128
+      ],
+      "id": "c8e96a0b-9686-4d68-aaf2-c49f13436705",
+      "name": "code",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -288,
+        1056
+      ],
+      "id": "9564087c-cbb2-495c-9b0e-ad00f2ff3a0d",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.scraperapi.com/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ \n  (() => {\n    const raw = ($json.website || '').trim();\n    if (!raw) return '';\n\n    let domain = raw\n      .replace(/^https?:\\/\\//i, '')\n      .replace(/^www\\./i, '')\n      .split('?')[0]\n      .split('#')[0]\n      .split('/')[0];\n\n    return `https://www.${domain}`;\n  })()\n}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -16,
+        864
+      ],
+      "id": "71f5b14c-99d0-4471-8f96-fc5890d8d345",
+      "name": "Fetch Homepage (ScraperAPI)",
+      "retryOnFail": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "Vox4mN8quQVljIVn",
+          "name": "ScraperAPI"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  (() => {\n    const raw = ($json.website || '').trim();\n\n    const domain = raw\n      .replace(/^https?:\\/\\//i, '')\n      .replace(/^www\\./i, '')\n      .split('?')[0]\n      .split('#')[0]\n      .split('/')[0];\n\n    return {\n     q: `site:${domain} (inurl:contact OR inurl:\"contact-us\" OR inurl:support OR inurl:help OR inurl:booking OR inurl:schedule OR inurl:appointments OR \"contact us\" OR \"get in touch\" OR \"request service\") OR site:trustpilot.com/review ${domain}`,\n      location: $node[\"configuration\"].json[\"location_str\"],\n      num: 10\n    };\n  })()\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        1280
+      ],
+      "id": "338b366e-4a0e-4b2b-b234-11857ad2215c",
+      "name": "Serper Router (Contact + Trustpilot)",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FheSFipO7zIdkXRZ",
+          "name": "SerperAPI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = Array.isArray($json) ? $json[0] : $json;\nconst organic = payload.organic || [];\n\nconst rawWebsite = ($node[\"Loop Over Items\"].json.website || \"\").trim();\n\nconst domain = rawWebsite\n  .replace(/^https?:\\/\\//i, \"\")\n  .replace(/^www\\./i, \"\")\n  .split(\"?\")[0]\n  .split(\"#\")[0]\n  .split(\"/\")[0]\n  .toLowerCase();\n\nconst isLikelyContact = (url = \"\") => {\n  const x = url.toLowerCase();\n  return (\n    x.includes(\"/contact\") ||\n    x.includes(\"contact-us\") ||\n    x.includes(\"get-in-touch\") ||\n    x.includes(\"/support\") ||\n    x.includes(\"/help\") ||\n    x.includes(\"/book\") ||\n    x.includes(\"/booking\") ||\n    x.includes(\"/schedule\") ||\n    x.includes(\"appointment\") ||\n    x.includes(\"request-service\") ||\n    x.includes(\"service-request\")\n  );\n};\n\nlet contact_url = null;\nlet trustpilot_url = null;\n\nfor (const r of organic) {\n  const link = (r.link || \"\").trim();\n  if (!link) continue;\n\n  if (!contact_url && link.toLowerCase().includes(domain) && isLikelyContact(link)) {\n    contact_url = link;\n  }\n\n  if (!trustpilot_url && link.toLowerCase().includes(\"trustpilot.com/review/\")) {\n    trustpilot_url = link;\n  }\n}\n\nconst canonical_url = domain ? `https://www.${domain}` : null;\n\nreturn [\n  {\n    json: {\n      ...$json,\n      domain,\n      canonical_url,\n      contact_url,\n      trustpilot_url,\n      organic_count: organic.length,\n    },\n    pairedItem: {\n      item: 0,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        1280
+      ],
+      "id": "cf281f08-d3bc-46d3-b778-2b97919b7bd7",
+      "name": "Parse Router URLs"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = String($json.data || \"\");\n\n// ============================================================\n// NEW: Extract all emails from full raw HTML before anything\n// is sliced, cleaned or deleted. We cap at 500k characters\n// to prevent the runner timing out on very large pages.\n// ============================================================\nconst extractEmailsFromText = (text) => {\n  const raw = String(text || \"\");\n  const found = [];\n  const plain = raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-z]{2,}/g) || [];\n  found.push(...plain);\n  return [...new Set(found.map(e => e.toLowerCase().trim()))].filter(e => e.includes(\"@\"));\n};\n\n// NEW: Cap HTML size before scanning to avoid runner timeout\nconst homepage_emails_raw = extractEmailsFromText(html.slice(0, 500000));\n// ============================================================\n\n// Extract only the <body> if available\nconst bodyMatch = html.match(/<body[^>]*>([\\s\\S]*?)<\\/body>/i);\nconst source = bodyMatch ? bodyMatch[1] : html;\n\n// Extract href links before stripping tags\nconst hrefs = [...source.matchAll(/href=[\"']([^\"'#]+)[\"']/gi)]\n  .map(m => String(m[1] || \"\").trim())\n  .filter(Boolean);\n\n// Extract + normalize + deduplicate mailto links\nconst homepage_mailtos = [...new Set(\n  hrefs\n    .filter(h => /^mailto:/i.test(h))\n    .map(h =>\n      h\n        .replace(/^mailto:/i, \"\")\n        .split(\"?\")[0]\n        .trim()\n        .toLowerCase()\n    )\n    .filter(Boolean)\n)];\n\n// Remove noisy blocks\nconst cleaned = source\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, \" \")\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, \" \")\n  .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, \" \")\n  .replace(/\\s+/g, \" \")\n  .trim();\n\n// Create top and bottom chunks\nconst homepage_text_top = cleaned.slice(0, 12000);\nconst homepage_text_bottom = cleaned.slice(-12000);\n\n// Remove bulky/raw input fields\nconst { data, website_html, ...rest } = $json;\n\nreturn [\n  {\n    json: {\n      ...rest,\n      homepage_text_top,\n      homepage_text_bottom,\n      homepage_links: hrefs,\n      homepage_mailtos,\n      homepage_emails_raw, // NEW: full raw HTML email scan added to output\n    },\n    pairedItem: {\n      item: 0,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        864
+      ],
+      "id": "85793020-ad4c-421b-a51d-5e6d2fafc2b3",
+      "name": "Clean Homepage HTML"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        624,
+        864
+      ],
+      "id": "ae27f881-6a92-41b2-b47d-2f3bd5181bcd",
+      "name": "Merge Lead Data",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const normalizeEmail = (e) =>\n  String(e || \"\")\n    .toLowerCase()\n    .trim()\n    .replace(/^mailto:/i, \"\")\n    .split(\"?\")[0]\n    .replace(/\\[at\\]|\\(at\\)|\\sat\\s/gi, \"@\")\n    .replace(/\\[dot\\]|\\(dot\\)|\\sdot\\s/gi, \".\")\n    .replace(/\\s+/g, \"\");\n\nconst extractEmailsFromText = (text) => {\n  const raw = String(text || \"\");\n  const found = [];\n\n  const plain =\n    raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-z]{2,}/g) || [];\n  found.push(...plain);\n\n  const obfuscated =\n    raw.match(\n      /[a-zA-Z0-9._%+-]+\\s*(?:@|\\[at\\]|\\(at\\)|\\sat\\s)\\s*[a-zA-Z0-9.-]+\\s*(?:\\.|\\[dot\\]|\\(dot\\)|\\sdot\\s)\\s*[a-z]{2,}/gi\n    ) || [];\n  found.push(...obfuscated);\n\n  return found.map(normalizeEmail).filter((e) => e.includes(\"@\"));\n};\n\nconst domain = String($json.domain || \"\").toLowerCase();\nconst candidates = [];\n\nconst addCandidate = (email, source, score = 0) => {\n  const normalized = normalizeEmail(email);\n  if (!normalized || !normalized.includes(\"@\")) return;\n  candidates.push({ email: normalized, source, score });\n};\n\n// ============================================================\n// NEW: Raw HTML email sources added first — these catch emails\n// that sit in the middle of the page and are missed by the\n// top/bottom 12k text chunks. Scored just below explicit\n// mailto links but above all text-parsed sources.\n// ============================================================\nfor (const e of ($json.contact_emails_raw || [])) {\n  addCandidate(e, \"contact_raw\", 108);\n}\nfor (const e of ($json.homepage_emails_raw || [])) {\n  addCandidate(e, \"homepage_raw\", 98);\n}\n// ============================================================\n\n// Explicit mailto links (highest confidence)\nfor (const e of ($json.contact_mailtos || [])) {\n  addCandidate(e, \"contact_mailto\", 110);\n}\nfor (const e of ($json.homepage_mailtos || [])) {\n  addCandidate(e, \"homepage_mailto\", 100);\n}\n\n// Footer/bottom first, then top\nfor (const e of extractEmailsFromText($json.contact_text_bottom)) {\n  addCandidate(e, \"contact_bottom\", 90);\n}\nfor (const e of extractEmailsFromText($json.homepage_text_bottom)) {\n  addCandidate(e, \"homepage_bottom\", 80);\n}\nfor (const e of extractEmailsFromText($json.contact_text_top)) {\n  addCandidate(e, \"contact_top\", 70);\n}\nfor (const e of extractEmailsFromText($json.homepage_text_top)) {\n  addCandidate(e, \"homepage_top\", 60);\n}\n\n// ---- SCORING ----\nfor (const c of candidates) {\n  const emailDomain = c.email.split(\"@\")[1] || \"\";\n\n  const matchesBusinessDomain =\n    domain &&\n    (emailDomain === domain || emailDomain.endsWith(\".\" + domain));\n\n  if (matchesBusinessDomain) {\n    // Always boost business domain emails\n    c.score += 40;\n  }\n  // ============================================================\n  // CHANGED: Removed the -35 non-domain penalty and the -10\n  // Gmail/Yahoo/Outlook penalty. Many small businesses use Gmail\n  // as their primary contact email. Penalizing it caused valid\n  // emails to score so low they were dropped and returned null.\n  // Business domain emails still win via the +40 boost above.\n  // ============================================================\n\n  // Only penalize noreply — these are never valid contact emails\n  if (/noreply|no-reply|donotreply/i.test(c.email)) {\n    c.score -= 50;\n  }\n}\n\n// Deduplicate by best score\nconst bestByEmail = new Map();\nfor (const c of candidates) {\n  const existing = bestByEmail.get(c.email);\n  if (!existing || c.score > existing.score) {\n    bestByEmail.set(c.email, c);\n  }\n}\n\nconst ranked = [...bestByEmail.values()].sort((a, b) => b.score - a.score);\n\n// Filter: prefer business domain emails if any exist, else use all\nconst domainMatched = ranked.filter((c) => {\n  const emailDomain = c.email.split(\"@\")[1] || \"\";\n  return domain && (emailDomain === domain || emailDomain.endsWith(\".\" + domain));\n});\n\nconst finalRanked = domainMatched.length ? domainMatched : ranked;\n\n// ============================================================\n// CHANGED: const → let so the fallback scan below can\n// reassign these if no email was found from any source above\n// ============================================================\nlet email = finalRanked.length ? finalRanked[0].email : null;\nlet email_source = finalRanked.length ? finalRanked[0].source : null;\nconst email_candidates = ranked.map((c) => c.email).slice(0, 5);\n\n// ============================================================\n// NEW: Last-resort fallback — if email is still null after all\n// sources above, scan every string field in the item for any\n// email pattern. Covers edge cases where data lands in\n// unexpected fields.\n// ============================================================\nif (!email) {\n  const everything = Object.values($json)\n    .filter((v) => typeof v === \"string\")\n    .join(\"\\n\");\n\n  const fallbackEmails = extractEmailsFromText(everything);\n\n  if (fallbackEmails.length) {\n    email = fallbackEmails[0];\n    email_source = \"fallback_scan\";\n  }\n}\n// ============================================================\n\n// ---- PHONE ----\nlet phone = $json.phone || null;\n\nconst phoneSearch =\n  `${$json.contact_text_top || \"\"}\\n` +\n  `${$json.contact_text_bottom || \"\"}\\n` +\n  `${$json.homepage_text_top || \"\"}\\n` +\n  `${$json.homepage_text_bottom || \"\"}`;\n\nif (!phone) {\n  const telMatch = phoneSearch.match(/tel:\\+?[0-9().\\-\\s]{7,}/i);\n  if (telMatch) {\n    phone = telMatch[0].replace(/^tel:/i, \"\").trim();\n  } else {\n    const phoneMatch = phoneSearch.match(\n      /(?:\\+?1[\\s.-]?)?(?:\\(?\\d{3}\\)?[\\s.-]?)\\d{3}[\\s.-]?\\d{4}/\n    );\n    if (phoneMatch) {\n      phone = phoneMatch[0].trim();\n    }\n  }\n}\n\n// ---- COMBINED TEXT FOR SIGNALS ----\nconst combined =\n  `${$json.homepage_text_top || \"\"}\\n` +\n  `${$json.homepage_text_bottom || \"\"}\\n` +\n  `${$json.contact_text_top || \"\"}\\n` +\n  `${$json.contact_text_bottom || \"\"}`;\n\n// ---- SIGNAL DETECTION ----\nconst hasAny = (patterns, haystack) => patterns.some((p) => p.test(haystack));\n\nconst chatSignals = [\n  /intercom/i, /drift/i, /tawk\\.to/i, /crisp\\.chat/i,\n  /zendesk/i, /livechat/i, /chat widget/i, /live chat/i,\n];\n\nconst schedulerSignals = [\n  /calendly/i, /acuityscheduling/i, /setmore/i, /youcanbook\\.me/i,\n  /simplybook/i, /squareup\\.com\\/appointments/i, /schedule-a-service/i,\n  /schedule service/i, /book now/i, /request appointment/i,\n];\n\nconst instantQuoteSignals = [\n  /instant quote/i, /get a quote/i, /request a quote/i,\n  /free estimate/i, /estimate/i,\n];\n\nconst callNowSignals = [\n  /call now/i, /tel:/i,\n];\n\nconst formSignals = [\n  /<form\\b/i, /contact form/i, /name=[\"']email[\"']/i,\n];\n\nconst crmSignals = [\n  /servicetitan/i, /housecallpro/i, /jobber/i,\n  /servicefusion/i, /fieldedge/i,\n];\n\nconst has_chat_widget = hasAny(chatSignals, combined);\nconst has_scheduler = hasAny(schedulerSignals, combined);\nconst has_instant_quote = hasAny(instantQuoteSignals, combined);\nconst has_call_now_cta = hasAny(callNowSignals, combined);\nconst has_form = hasAny(formSignals, combined);\nconst crm_detected = crmSignals.some((p) => p.test(combined));\n\nreturn {\n  json: {\n    ...$json,\n    email,\n    email_source,\n    email_candidates,\n    crm_detected,\n    phone,\n    has_chat_widget,\n    has_scheduler,\n    has_instant_quote,\n    has_call_now_cta,\n    has_form,\n  },\n  pairedItem: {\n    item: 0,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        864
+      ],
+      "id": "8f8718fb-bf09-4f32-9ad6-07da06e31575",
+      "name": "Detect + Extract (Homepage + Contact)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const {\n  has_chat_widget,\n  has_scheduler,\n  has_instant_quote,\n  has_call_now_cta,\n  has_form,\n  email,\n  phone,\n  contact_url,\n} = $json;\n\nlet score = 0;\nconst gaps = [];\n\nif (has_call_now_cta) score += 2;\nelse gaps.push(\"No clear Call-Now CTA\");\n\nif (has_form) score += 3;\nelse gaps.push(\"No contact form\");\n\nif (has_chat_widget) score += 3;\nelse gaps.push(\"No chat widget\");\n\nif (has_scheduler) score += 4;\nelse gaps.push(\"No booking/scheduler\");\n\nif (has_instant_quote) score += 2;\nelse gaps.push(\"No instant quote/estimate\");\n\nif (email) score += 1;\nelse gaps.push(\"No email visible\");\n\nif (phone) score += 1;\nelse gaps.push(\"No phone detected\");\n\nif (score > 10) score = 10;\n\nconst pain_point_summary =\n  score >= 8\n    ? \"Strong speed-to-lead setup; only minor improvements needed.\"\n    : score >= 5\n      ? \"Decent speed-to-lead, but missing 1–2 key instant-response channels.\"\n      : \"Slow speed-to-lead risk: missing key response channels and friction is likely causing lost leads.\";\n\nconst evidence = [\n  has_call_now_cta ? \"call-now:yes\" : \"call-now:no\",\n  has_form ? \"form:yes\" : \"form:no\",\n  has_chat_widget ? \"chat:yes\" : \"chat:no\",\n  has_scheduler ? \"scheduler:yes\" : \"scheduler:no\",\n  has_instant_quote ? \"quote:yes\" : \"quote:no\",\n  email ? `email:${email}` : \"email:none\",\n  phone ? `phone:${phone}` : \"phone:none\",\n  contact_url ? `contact_url:${contact_url}` : \"contact_url:none\",\n].join(\" | \");\n\nreturn [\n  {\n    json: {\n      ...$json,\n      speed_to_lead_score: score,\n      speed_to_lead_gaps: gaps.join(\"; \"),\n      pain_point_summary,\n      evidence,\n    },\n    pairedItem: {\n      item: 0,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        864
+      ],
+      "id": "911f1068-d333-4ebd-9541-fa42348cd339",
+      "name": "Score Speed-to-Lead"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1TqpC_XvbcymB6xAC0Hhiw25bUGtPS1806KhuUDCT-rg",
+          "mode": "list",
+          "cachedResultName": "LeadAgent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "has_chat_widget": "={{ $json.has_chat_widget }}",
+            "has_scheduler": "={{ $json.has_scheduler }}",
+            "has_instant_quote": "={{ $json.has_instant_quote }}",
+            "has_call_now_cta": "={{ $json.has_call_now_cta }}",
+            "has_form": "={{ $json.has_form }}",
+            "speed_to_lead_score": "={{ $json.speed_to_lead_score }}",
+            "speed_to_lead_gaps": "={{ $json.speed_to_lead_gaps }}",
+            "pain_point_summary": "={{ $json.pain_point_summary }}",
+            "evidence": "={{ $json.evidence }}",
+            "canonical_url": "={{ $json.canonical_url }}",
+            "contact_url": "={{ $json.contact_url }}",
+            "business_name": "={{ $json.business_name }}",
+            "row_number": 0
+          },
+          "matchingColumns": [
+            "business_name"
+          ],
+          "schema": [
+            {
+              "id": "business_name",
+              "displayName": "business_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "canonical_url",
+              "displayName": "canonical_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "contact_url",
+              "displayName": "contact_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "has_chat_widget",
+              "displayName": "has_chat_widget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "has_scheduler",
+              "displayName": "has_scheduler",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "has_instant_quote",
+              "displayName": "has_instant_quote",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "has_call_now_cta",
+              "displayName": "has_call_now_cta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "has_form",
+              "displayName": "has_form",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "speed_to_lead_score",
+              "displayName": "speed_to_lead_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "speed_to_lead_gaps",
+              "displayName": "speed_to_lead_gaps",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "pain_point_summary",
+              "displayName": "pain_point_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "evidence",
+              "displayName": "evidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2880,
+        832
+      ],
+      "id": "708f0195-451e-4fe2-b0bc-f115cda7f923",
+      "name": "Upsert_leads",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "oyWLDixF3i7dFkSV",
+          "name": "GOOGLE_API_KEY"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "formTitle": "Lead Scraper",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Seniority Level",
+              "fieldType": "checkbox",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "CEO"
+                  },
+                  {
+                    "option": "Founder"
+                  },
+                  {
+                    "option": "Owner"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company size ",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "1-10"
+                  },
+                  {
+                    "option": "11-20"
+                  },
+                  {
+                    "option": "21-30"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Industry",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Country",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "State",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "num_search_terms",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "top_results",
+              "fieldType": "number",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        208,
+        192
+      ],
+      "id": "d924cd75-24ab-43fb-bdeb-ea25f4f9bed6",
+      "name": "On form submission",
+      "webhookId": "1387ee3e-e857-4519-aea2-954998ce57ed"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1TqpC_XvbcymB6xAC0Hhiw25bUGtPS1806KhuUDCT-rg",
+          "mode": "list",
+          "cachedResultName": "SerperLeadAgent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "business_name": "={{ $json.name }}",
+            "category": "={{ $json.category }}",
+            "phone": "={{ $json.phone }}",
+            "website": "={{ $json.website }}",
+            "address": "={{ $json.address.split(',').slice(-2).map(p => p.trim()).join(', ').replace(/\\s+\\d{5}(-\\d{4})?$/, '').trim() }}"
+          },
+          "matchingColumns": [
+            "business_name"
+          ],
+          "schema": [
+            {
+              "id": "business_name",
+              "displayName": "business_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "canonical_url",
+              "displayName": "canonical_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contact_url",
+              "displayName": "contact_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "has_chat_widget",
+              "displayName": "has_chat_widget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "has_scheduler",
+              "displayName": "has_scheduler",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "has_instant_quote",
+              "displayName": "has_instant_quote",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "has_call_now_cta",
+              "displayName": "has_call_now_cta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "has_form",
+              "displayName": "has_form",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "speed_to_lead_score",
+              "displayName": "speed_to_lead_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "speed_to_lead_gaps",
+              "displayName": "speed_to_lead_gaps",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "pain_point_summary",
+              "displayName": "pain_point_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "evidence",
+              "displayName": "evidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2976,
+        224
+      ],
+      "id": "4f9d84f7-4a3b-476e-87c9-acfbab41905b",
+      "name": "update sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "oyWLDixF3i7dFkSV",
+          "name": "GOOGLE_API_KEY
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2999ac21-04ea-40a4-863e-1976885ea48b",
+              "name": "homepage_text_top",
+              "value": "={{ $json.homepage_text_top }}",
+              "type": "string"
+            },
+            {
+              "id": "c7da8917-5538-4fe4-9e0c-1710b1f40286",
+              "name": "homepage_text_bottom",
+              "value": "={{ $json.homepage_text_bottom }}",
+              "type": "string"
+            },
+            {
+              "id": "c6b8873c-0ddf-4e58-8b7d-f88426c0410a",
+              "name": "contact_text_top",
+              "value": "={{ $json.contact_text_top }}",
+              "type": "string"
+            },
+            {
+              "id": "b8b88c36-8b66-41fa-a893-d83dee4a4ff4",
+              "name": "business_name",
+              "value": "={{ $('Loop Over Items').item.json.business_name }}",
+              "type": "string"
+            },
+            {
+              "id": "e572fe70-f645-49f1-8ba7-12326d7baaf8",
+              "name": "contact_text_bottom",
+              "value": "={{ $json.contact_text_bottom }}",
+              "type": "string"
+            },
+            {
+              "id": "9913a63b-29c0-461d-9ee2-6fa6321801ab",
+              "name": "contact_mailtos",
+              "value": "={{ $json.contact_mailtos }}",
+              "type": "array"
+            },
+            {
+              "id": "c961ba32-7605-4c1d-90b8-13d3be5c23d4",
+              "name": "domain",
+              "value": "={{ $json.domain }}",
+              "type": "string"
+            },
+            {
+              "id": "9baec0f0-0227-4ea0-85a8-688b43979087",
+              "name": "canonical_url",
+              "value": "={{ $json.canonical_url }}",
+              "type": "string"
+            },
+            {
+              "id": "c7d1bb15-20c3-47d0-95e2-ecb657cbc350",
+              "name": "contact_url",
+              "value": "={{ $json.contact_url }}",
+              "type": "string"
+            },
+            {
+              "id": "6af07f59-6805-4251-8d0c-7a736f71aa38",
+              "name": "trustpilot_url",
+              "value": "={{ $json.trustpilot_url }}",
+              "type": "string"
+            },
+            {
+              "id": "d323a51e-bc9b-40e6-b4d9-c900a6ee1a72",
+              "name": "homepage_mailtos",
+              "value": "={{ $json.homepage_mailtos }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1424,
+        864
+      ],
+      "id": "3750c300-4134-4ac9-a95d-70315694be73",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "https://api.scraperapi.com/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.contact_url }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        384,
+        1280
+      ],
+      "id": "67eb8f20-9124-4f6c-916d-2b515d71f56f",
+      "name": "Fetch Contact (ScraperAPI)",
+      "retryOnFail": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "Vox4mN8quQVljIVn",
+          "name": "ScraperAPI"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const html = String($json.data || \"\");\n\n// ============================================================\n// NEW: Extract all emails from full raw HTML before anything\n// is sliced, cleaned or deleted. This catches emails that sit\n// in the middle of the page and would be missed by the\n// top/bottom 12k text chunks below.\n// Cap at 500k characters to prevent runner timeout on\n// very large pages.\n// ============================================================\nconst extractEmailsFromText = (text) => {\n  const raw = String(text || \"\");\n  const found = [];\n  const plain = raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-z]{2,}/g) || [];\n  found.push(...plain);\n  return [...new Set(found.map(e => e.toLowerCase().trim()))].filter(e => e.includes(\"@\"));\n};\n\n// CHANGED: html.slice(0, 500000) to prevent runner timeout on large pages\nconst contact_emails_raw = extractEmailsFromText(html.slice(0, 500000));\n// ============================================================\n\n// Extract only the <body> if available\nconst bodyMatch = html.match(/<body[^>]*>([\\s\\S]*?)<\\/body>/i);\nconst source = bodyMatch ? bodyMatch[1] : html;\n\n// Extract href links before stripping tags\nconst hrefs = [...source.matchAll(/href=[\"']([^\"'#]+)[\"']/gi)]\n  .map(m => String(m[1] || \"\").trim())\n  .filter(Boolean);\n\n// Extract + normalize + deduplicate mailto links\nconst contact_mailtos = [...new Set(\n  hrefs\n    .filter(h => /^mailto:/i.test(h))\n    .map(h =>\n      h\n        .replace(/^mailto:/i, \"\")\n        .split(\"?\")[0]\n        .trim()\n        .toLowerCase()\n    )\n    .filter(Boolean)\n)];\n\n// Remove noisy blocks\nconst cleaned = source\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, \" \")\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, \" \")\n  .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, \" \")\n  .replace(/\\s+/g, \" \")\n  .trim();\n\n// Create top and bottom chunks\nconst contact_text_top = cleaned.slice(0, 12000);\nconst contact_text_bottom = cleaned.slice(-12000);\n\nreturn {\n  json: {\n    contact_text_top,\n    contact_text_bottom,\n    contact_links: hrefs,\n    contact_mailtos,\n    contact_emails_raw, // NEW: full raw HTML email scan added to output\n    domain: $node[\"Parse Router URLs\"].json.domain || null,\n    canonical_url: $node[\"Parse Router URLs\"].json.canonical_url || null,\n    trustpilot_url: $node[\"Parse Router URLs\"].json.trustpilot_url || null,\n    contact_url: $node[\"Parse Router URLs\"].json.contact_url || null,\n  },\n  pairedItem: {\n    item: 0,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        1264
+      ],
+      "id": "662c2235-b28e-40c4-bde3-e7afb2bcb080",
+      "name": "Clean Contact HTML"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0ddb6929-b796-42c3-bc69-c84259566f76",
+              "name": "business_name",
+              "value": "={{ $json.business_name }}",
+              "type": "string"
+            },
+            {
+              "id": "4b3cea8e-edfe-472d-9f80-8f7e97973bb8",
+              "name": "domain",
+              "value": "={{ $json.domain }}",
+              "type": "string"
+            },
+            {
+              "id": "6ee5ab7e-1c1e-4534-b5e8-dce7f5909c27",
+              "name": "canonical_url",
+              "value": "={{ $json.canonical_url }}",
+              "type": "string"
+            },
+            {
+              "id": "709ef27d-fb30-475d-b561-c52b32d22cd5",
+              "name": "contact_url",
+              "value": "={{ $json.contact_url }}",
+              "type": "string"
+            },
+            {
+              "id": "272f3875-0228-4ec0-95d2-62f30ad47d5e",
+              "name": "email",
+              "value": "={{ $json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "dc3faf9a-1271-4410-b0f6-ac6b0e0e2caf",
+              "name": "email_source",
+              "value": "={{ $json.email_source }}",
+              "type": "string"
+            },
+            {
+              "id": "2477d91e-1d5b-4136-a05a-b271a93f30ec",
+              "name": "has_chat_widget",
+              "value": "={{ $json.has_chat_widget }}",
+              "type": "boolean"
+            },
+            {
+              "id": "aeaf0647-0cf1-4a4d-b64d-a10ac6928e56",
+              "name": "has_instant_quote",
+              "value": "={{ $json.has_instant_quote }}",
+              "type": "boolean"
+            },
+            {
+              "id": "669a1ff4-caed-4660-b67c-5e4b2e192c6d",
+              "name": "has_call_now_cta",
+              "value": "={{ $json.has_call_now_cta }}",
+              "type": "boolean"
+            },
+            {
+              "id": "181d7628-68bc-4683-8efd-41dd33ac8d9c",
+              "name": "has_form",
+              "value": "={{ $json.has_form }}",
+              "type": "boolean"
+            },
+            {
+              "id": "3ce6d662-8771-44ce-9d72-54a7453fa30c",
+              "name": "crm_detected",
+              "value": "={{ $json.crm_detected }}",
+              "type": "boolean"
+            },
+            {
+              "id": "f83819a1-9518-4431-9068-f115cdeec29e",
+              "name": "has_scheduler",
+              "value": "={{ $json.has_scheduler }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1984,
+        864
+      ],
+      "id": "055d47a4-10b5-48f5-8b5d-7218888d0ac5",
+      "name": "Cleanup Fields"
+    },
+    {
+      "parameters": {
+        "sendTo": "plug.aisolutions@gmail.com",
+        "subject": "={{ $json.emailSubject }}",
+        "emailType": "text",
+        "message": "={{ $json.emailBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3376,
+        1024
+      ],
+      "id": "d8bd2d42-717d-4e97-bb08-e283706d784f",
+      "name": "Send a message",
+      "webhookId": "e5f011fd-e99a-4fa5-b305-24909b57c4e9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "S6jaJXrEcsGNTTjM",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. In the \"Done\" branch of a Loop, $input.all() contains all items from the loop\nconst allItems = $input.all(); \nconst totalLeads = allItems.length;\n\n// 2. Helper to filter out those image files in the email field\nconst isValidEmail = (email) => {\n  if (!email || typeof email !== 'string') return false;\n  const lower = email.toLowerCase();\n  return lower.includes('@') && \n         !lower.endsWith('.webp') && \n         !lower.endsWith('.png') && \n         !lower.endsWith('.jpg');\n};\n\n// 3. Aggregate stats from your data fields\nconst highPerformance = allItems.filter(i => (i.json.speed_to_lead_score || 0) >= 8).length;\nconst lowPerformance = allItems.filter(i => (i.json.speed_to_lead_score || 0) <= 3).length;\nconst leadsWithEmails = allItems.filter(i => isValidEmail(i.json.email)).length;\nconst leadsWithSchedulers = allItems.filter(i => i.json.has_scheduler === true).length;\n\n// 4. Create the sample list\nconst sampleList = allItems\n  .slice(0, 5)\n  .map(i => `- ${i.json.business_name || 'Unknown'}: Score ${i.json.speed_to_lead_score || 0}`)\n  .join('\\n');\n\nreturn {\n  emailSubject: `✅ Lead Export: ${totalLeads} Leads (${highPerformance} Hot)`,\n  emailBody: `\nThe SERPER Lead Scraper has finished.\n\nTOTAL STATS:\n- Total Leads Processed: ${totalLeads}\n- High Quality (Score 8-10): ${highPerformance}\n- Critical Gaps (Score 0-3): ${lowPerformance}\n- Valid Emails Found: ${leadsWithEmails}\n- Schedulers Detected: ${leadsWithSchedulers}\n\nTOP 5 SAMPLES:\n${sampleList}\n\nThe full list is now available in your Google Sheet.\n  `\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        1024
+      ],
+      "id": "3d3dcd71-f802-4054-b5bc-e95253cc2658",
+      "name": "summarize_"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2384,
+        1280
+      ],
+      "id": "d5fbfe51-716b-44e7-9a82-87ece68c8da0",
+      "name": "Wait",
+      "webhookId": "8d52c776-ff8c-48c5-b901-a31cbef11604"
+    },
+    {
+      "parameters": {
+        "content": "LLM SEARCH / KEYWORD GENERATION",
+        "height": 624,
+        "width": 512,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1152,
+        -288
+      ],
+      "typeVersion": 1,
+      "id": "a9bfd71c-e9a3-4b11-8607-f4a389515214",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "UPDATE LEADS SHEET",
+        "height": 608,
+        "width": 736
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2384,
+        -208
+      ],
+      "typeVersion": 1,
+      "id": "accc39fa-42ff-4cd0-b8dd-a91241052f8d",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "                                                                   GET LEADS ENRICHMENT FROM WEBSITE ",
+        "height": 960,
+        "width": 1744,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -448,
+        592
+      ],
+      "typeVersion": 1,
+      "id": "16dcb0bb-fbb3-4a87-93ec-86d57a98e14b",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "UPSERT LEAD SHEET AND  EMAIL NOTIFICATION",
+        "height": 752,
+        "width": 1264,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2736,
+        752
+      ],
+      "typeVersion": 1,
+      "id": "d3d11ac6-c5b3-4830-8706-d55649f79cdf",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "                                                                     EXTRACT ALL LEAD ENRICHMENT DATA AND UPSERT SHEET",
+        "height": 864,
+        "width": 1344,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1376,
+        640
+      ],
+      "typeVersion": 1,
+      "id": "414b4231-de59-4cdc-b5b8-f750bf9600f1",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "USER SEARCH QUERY AND FORMAT ",
+        "height": 560,
+        "width": 640,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        144,
+        -240
+      ],
+      "typeVersion": 1,
+      "id": "fa78ca98-0055-4847-a5f6-b4a5a10e643c",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "SEARCH RESULTS",
+        "height": 432,
+        "width": 512,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1744,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "f21e8f59-8fad-4a53-a6c3-9283968a06bb",
+      "name": "Sticky Note7"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "configuration": {
+      "main": [
+        [
+          {
+            "node": "create search terms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "create search terms",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "create search terms",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "searchwithSerper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create search terms": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FormatQuery": {
+      "main": [
+        [
+          {
+            "node": "configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "searchwithSerper": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "code": {
+      "main": [
+        [
+          {
+            "node": "update sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "summarize_",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Homepage (ScraperAPI)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Serper Router (Contact + Trustpilot)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Homepage (ScraperAPI)": {
+      "main": [
+        [
+          {
+            "node": "Clean Homepage HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serper Router (Contact + Trustpilot)": {
+      "main": [
+        [
+          {
+            "node": "Parse Router URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Router URLs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Contact (ScraperAPI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Homepage HTML": {
+      "main": [
+        [
+          {
+            "node": "Merge Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect + Extract (Homepage + Contact)": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Speed-to-Lead": {
+      "main": [
+        [
+          {
+            "node": "Upsert_leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert_leads": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "FormatQuery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Detect + Extract (Homepage + Contact)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Contact (ScraperAPI)": {
+      "main": [
+        [
+          {
+            "node": "Clean Contact HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Clean Contact HTML": {
+      "main": [
+        [
+          {
+            "node": "Merge Lead Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Cleanup Fields": {
+      "main": [
+        [
+          {
+            "node": "Score Speed-to-Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "summarize_": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4d9838b1-48ce-4a3e-9e48-9cea53069737",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "159fb8e7cf5d5a89c6bd3073d96d9f3c79a4bbea42d9210ea829d5af550cb2a3"
+  },
+  "id": "_GQsARnsGgdYieNdIz53K",
+  "tags": []
+}
